@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+:root {
+  /* Shared app content surface — full-screen mobile apps, timeline rings */
+  --app-surface: #121212;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -14,48 +19,7 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
-/* macOS Sonoma wallpaper gradient */
-.wallpaper {
-  background: linear-gradient(
-    135deg,
-    #1a0533 0%,
-    #3b1060 15%,
-    #6b2fa0 30%,
-    #9b4dca 45%,
-    #c77dff 55%,
-    #e0a0ff 65%,
-    #ffb347 78%,
-    #ff8c00 88%,
-    #c0392b 100%
-  );
-}
-
-/* Frosted glass */
-.glass {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.glass-dark {
-  background: rgba(30, 20, 50, 0.55);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-/* Dock pill */
-.dock-container {
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(30px) saturate(200%);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.35);
-}
-
-/* Window scrollbar */
+/* Scrollable overlay body — thin scrollbar inside app sheets */
 .window-body::-webkit-scrollbar {
   width: 6px;
 }
@@ -67,12 +31,38 @@ html, body, #root {
   border-radius: 3px;
 }
 
-/* Desktop icon hover */
-.desktop-icon:hover .icon-label {
-  background: rgba(0, 120, 215, 0.7);
+/* Mac window: light chrome matching title bar (#ececed) */
+.window-body-mac-grey::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.18);
+  border-radius: 3px;
 }
 
-/* Prevent text selection during drag */
-.dragging * {
-  user-select: none;
+/* Mobile: respect iPhone safe-area insets */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-safe-bottom {
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Home screen wallpaper (`public/background.jpg`) */
+.wallpaper-mobile {
+  background-color: #5ec4cf;
+  background-image: url('/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Subtle text shadow used on iOS home-screen app labels for readability */
+.ios-label-shadow {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* Horizontal snap strips (Friends widget): hide scrollbars; snapping stays inline on the element */
+.widget-strip-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.widget-strip-scroll::-webkit-scrollbar {
+  display: none;
 }

@@ -1,16 +1,26 @@
 export interface Project {
   id: string
   name: string
+  /** Short one-liner shown under the card on the projects grid. */
+  tagline: string
+  /** Long description shown on the project detail page. */
   description: string
   tags: string[]
   githubUrl?: string
   liveUrl?: string
   emoji: string
+  /**
+   * Optional path to a banner image (relative to /public). When omitted or the
+   * file is missing, the card falls back to a gradient built from `accent`.
+   * Drop files into `public/projects/<id>.png` to enable.
+   */
+  bannerImage?: string
+  /** Accent colour used for the gradient fallback banner and detail header. */
+  accent: { from: string; to: string }
 }
 
 export interface SkillCategory {
   name: string
-  emoji: string
   skills: string[]
 }
 
@@ -22,76 +32,101 @@ export interface Experience {
   location: string
   bullets: string[]
   emoji: string
+  /** If set, shows an orange “Learn more” link with an external-link icon. */
+  learnMoreUrl?: string
 }
 
 export const projects: Project[] = [
   {
     id: 'devflow',
     name: 'DevFlow',
-    description: 'A real-time collaborative code editor with syntax highlighting, live cursors, and integrated AI code suggestions powered by GPT-4.',
+    tagline: 'Real-time collaborative code editor',
+    description:
+      'DevFlow is a real-time collaborative code editor with syntax highlighting, live cursors, and integrated AI code suggestions powered by GPT-4.\n\nBuilt around low-latency presence, conflict-free editing, and an extensible plugin system so teams can pair-program from anywhere without losing flow.',
     tags: ['React', 'TypeScript', 'Node.js', 'WebSockets', 'OpenAI'],
     githubUrl: 'https://github.com',
     liveUrl: 'https://example.com',
     emoji: '⚡',
+    bannerImage: '/projects/devflow.png',
+    accent: { from: '#fbbf24', to: '#ef4444' },
   },
   {
     id: 'cloudvault',
     name: 'CloudVault',
-    description: 'End-to-end encrypted file storage service with client-side encryption, folder sharing, and versioning. Handles 10k+ daily active users.',
+    tagline: 'End-to-end encrypted file storage',
+    description:
+      'CloudVault is an end-to-end encrypted file storage service with client-side encryption, folder sharing, and versioning. It handles 10k+ daily active users.\n\nDesigned around zero-trust security, fast resumable uploads, and a clean sharing model that keeps encryption keys on the client at all times.',
     tags: ['Next.js', 'PostgreSQL', 'AWS S3', 'Docker', 'Redis'],
     githubUrl: 'https://github.com',
     liveUrl: 'https://example.com',
     emoji: '🔒',
+    bannerImage: '/projects/cloudvault.png',
+    accent: { from: '#60a5fa', to: '#7c3aed' },
   },
   {
     id: 'pulsemetrics',
     name: 'PulseMetrics',
-    description: 'Lightweight analytics dashboard that ingests event streams, aggregates KPIs in real time, and renders interactive charts with drill-down support.',
+    tagline: 'Real-time analytics dashboard',
+    description:
+      'PulseMetrics is a lightweight analytics dashboard that ingests event streams, aggregates KPIs in real time, and renders interactive charts with drill-down support.\n\nThe pipeline is tuned for sub-second ingestion-to-visualisation latency, with a focus on observable, low-overhead instrumentation.',
     tags: ['Python', 'FastAPI', 'Kafka', 'ClickHouse', 'D3.js'],
     githubUrl: 'https://github.com',
     emoji: '📊',
+    bannerImage: '/projects/pulsemetrics.png',
+    accent: { from: '#22d3ee', to: '#0ea5e9' },
   },
   {
     id: 'notionclone',
     name: 'NoteSpace',
-    description: 'Block-based note-taking app with drag-and-drop editor, nested pages, slash commands, and offline sync via CRDTs.',
+    tagline: 'Block-based note-taking app',
+    description:
+      'NoteSpace is a block-based note-taking app with a drag-and-drop editor, nested pages, slash commands, and offline sync via CRDTs.\n\nLocal-first by design — every edit persists instantly to IndexedDB and merges cleanly across devices, even after long stretches offline.',
     tags: ['React', 'TypeScript', 'Yjs', 'IndexedDB', 'Tailwind'],
     githubUrl: 'https://github.com',
     liveUrl: 'https://example.com',
     emoji: '📝',
+    bannerImage: '/projects/notionclone.png',
+    accent: { from: '#a78bfa', to: '#ec4899' },
   },
 ]
 
 export const skillCategories: SkillCategory[] = [
   {
     name: 'Languages',
-    emoji: '💬',
-    skills: ['TypeScript', 'JavaScript', 'Python', 'Go', 'SQL', 'Rust'],
+    skills: ['C/C++', 'Javascript', 'Python', 'HTML', 'CSS/SCSS', 'Bash', 'SQL'],
   },
   {
-    name: 'Frontend',
-    emoji: '🎨',
-    skills: ['React', 'Next.js', 'Tailwind CSS', 'Framer Motion', 'D3.js', 'Vite'],
+    name: 'Frameworks/Libraries',
+    skills: [
+      'React',
+      'Node.js',
+      'Vite',
+      'Playwright',
+      'scikit-learn',
+      'Pytorch',
+      'Pandas',
+      'NumPy',
+      'LangChain',
+      'Pytest',
+    ],
   },
   {
-    name: 'Backend',
-    emoji: '⚙️',
-    skills: ['Node.js', 'FastAPI', 'GraphQL', 'REST APIs', 'WebSockets', 'gRPC'],
-  },
-  {
-    name: 'Databases',
-    emoji: '🗄️',
-    skills: ['PostgreSQL', 'MongoDB', 'Redis', 'ClickHouse', 'Prisma', 'SQLite'],
-  },
-  {
-    name: 'Cloud & DevOps',
-    emoji: '☁️',
-    skills: ['AWS', 'Docker', 'Kubernetes', 'GitHub Actions', 'Terraform', 'Vercel'],
-  },
-  {
-    name: 'Tools',
-    emoji: '🛠️',
-    skills: ['Git', 'VS Code', 'Figma', 'Linear', 'Datadog', 'Postman'],
+    name: 'Technologies',
+    skills: [
+      'Linux',
+      'Git',
+      'VS Code',
+      'Cursor',
+      'Google Cloud',
+      'AWS',
+      'PostgreSQL',
+      'Supabase',
+      'OAuth',
+      'Jupyter',
+      'MATLAB',
+      'Figma',
+      'Arduino',
+    ],
   },
 ]
 
