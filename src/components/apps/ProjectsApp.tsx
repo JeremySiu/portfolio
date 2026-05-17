@@ -11,10 +11,27 @@ interface TagStyle {
   bg: string
   fg: string
   border?: string
+  /** Improves contrast on busy gradients (e.g. Gemini). */
+  textShadow?: string
+}
+
+const LANGCHAIN_FAMILY_STYLE: TagStyle = {
+  bg: '#1c3532',
+  fg: '#ffffff',
+  border: 'rgba(255,255,255,0.2)',
+}
+
+/** Google Gemini logo hues: red-pink → blue → green → yellow */
+const GEMINI_TAG_STYLE: TagStyle = {
+  bg: 'conic-gradient(from -35deg at 50% 50%, #ff5252 0deg, #4285f4 100deg, #34a853 200deg, #fbbc04 290deg, #ff5252 360deg)',
+  fg: '#ffffff',
+  border: 'rgba(255,255,255,0.35)',
+  textShadow: '0 1px 2px rgba(0,0,0,0.55)',
 }
 
 const TAG_PALETTE: Record<string, TagStyle> = {
   react: { bg: '#0b2530', fg: '#61dafb', border: 'rgba(97,218,251,0.45)' },
+  'react flow': { bg: '#0b2530', fg: '#61dafb', border: 'rgba(97,218,251,0.45)' },
   'next.js': { bg: '#ffffff', fg: '#0a0a0a' },
   nextjs: { bg: '#ffffff', fg: '#0a0a0a' },
   'node.js': { bg: '#1f8a36', fg: '#ffffff' },
@@ -24,23 +41,49 @@ const TAG_PALETTE: Record<string, TagStyle> = {
   python: { bg: '#3776ab', fg: '#ffffff' },
   go: { bg: '#00add8', fg: '#ffffff' },
   rust: { bg: '#dea584', fg: '#1a1a1a' },
+  'scikit-learn': {
+    bg: '#2b9fdc',
+    fg: '#ffffff',
+    border: 'rgba(255,255,255,0.28)',
+  },
+  /** Pandas logo blue */
+  pandas: { bg: '#5682a3', fg: '#ffffff', border: 'rgba(255,255,255,0.25)' },
+  /** Seaborn logo blue-purple */
+  seaborn: { bg: '#4c4c7a', fg: '#ffffff', border: 'rgba(255,255,255,0.22)' },
+  /** NumPy logo blue (wordmark) */
+  numpy: { bg: '#4d77cf', fg: '#ffffff', border: 'rgba(255,255,255,0.28)' },
+  /** Jupyter brand orange */
+  jupyter: { bg: '#f37626', fg: '#ffffff', border: 'rgba(255,255,255,0.3)' },
+  // Playwright: comedy-mask greens (light → dark)
+  playwright: {
+    bg: 'linear-gradient(90deg, #4caf50 0%, #2e7d32 100%)',
+    fg: '#ffffff',
+    border: 'rgba(255,255,255,0.25)',
+  },
   sql: { bg: '#4a6fa1', fg: '#ffffff' },
   postgresql: { bg: '#336791', fg: '#ffffff' },
   mongodb: { bg: '#13aa52', fg: '#ffffff' },
   redis: { bg: '#dc382c', fg: '#ffffff' },
   sqlite: { bg: '#0b3b57', fg: '#ffffff' },
   clickhouse: { bg: '#ffcc00', fg: '#0a0a0a' },
+  /** ColabFold — Google Colab oranges (#F9AB00 bright, #E37400 deep) */
+  colabfold: { bg: '#E37400', fg: '#ffffff', border: 'rgba(249,175,0,0.95)' },
   kafka: { bg: '#231f20', fg: '#ffffff', border: 'rgba(255,255,255,0.18)' },
   'aws s3': { bg: '#ff9900', fg: '#0a0a0a' },
   aws: { bg: '#ff9900', fg: '#0a0a0a' },
   docker: { bg: '#2496ed', fg: '#ffffff' },
   kubernetes: { bg: '#326ce5', fg: '#ffffff' },
+  /** LangChain / LangFlow: same forest-teal pill */
+  langchain: LANGCHAIN_FAMILY_STYLE,
+  langflow: LANGCHAIN_FAMILY_STYLE,
   graphql: { bg: '#e10098', fg: '#ffffff' },
   tailwind: { bg: '#0ea5e9', fg: '#ffffff' },
   'tailwind css': { bg: '#0ea5e9', fg: '#ffffff' },
   fastapi: { bg: '#009688', fg: '#ffffff' },
   websockets: { bg: '#8b5cf6', fg: '#ffffff' },
   openai: { bg: '#10a37f', fg: '#ffffff' },
+  gemini: GEMINI_TAG_STYLE,
+  'gemini api': GEMINI_TAG_STYLE,
   yjs: { bg: '#ec4899', fg: '#ffffff' },
   indexeddb: { bg: '#a855f7', fg: '#ffffff' },
   'd3.js': { bg: '#f97316', fg: '#ffffff' },
@@ -136,6 +179,9 @@ function ProjectBanner({
               width: '100%',
               height: '100%',
               objectFit: 'cover',
+              objectPosition: project.bannerObjectPosition ?? 'center',
+              transform: project.bannerImageScale ? `scale(${project.bannerImageScale})` : undefined,
+              transformOrigin: project.bannerImageTransformOrigin ?? 'center center',
               display: 'block',
               opacity: imgLoaded ? 1 : 0,
               transition: 'opacity 0.2s ease',
@@ -367,6 +413,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
                 border: s.border ? `1px solid ${s.border}` : 'none',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
                 lineHeight: 1.2,
+                ...(s.textShadow ? { textShadow: s.textShadow } : {}),
               }}
             >
               {tag}

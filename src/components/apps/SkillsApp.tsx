@@ -6,10 +6,17 @@ import { AppSurfaceContext } from '../../context/AppSurfaceContext'
 const PILL_FG = '#0b0e14'
 const ICON_COLOR = '0b0e14'
 
+/** Per-skill Simple Icons fill (hex without `#`). Default matches pill text. */
+const SKILL_ICON_COLORS: Record<string, string> = {
+  /** Mask-inspired forest green */
+  playwright: '2e7d32',
+}
+
 /** Simple Icons CDN slugs (dark fill to match light pills). */
 const SKILL_SLUGS: Record<string, string> = {
   'c/c++': 'cplusplus',
   javascript: 'javascript',
+  typescript: 'typescript',
   python: 'python',
   html: 'html5',
   'css/scss': 'sass',
@@ -58,13 +65,15 @@ function FallbackGlyph() {
 
 function SkillGlyph({ label }: { label: string }) {
   const slug = skillSlug(label)
+  const key = label.trim().toLowerCase()
+  const iconColor = SKILL_ICON_COLORS[key] ?? ICON_COLOR
   const [failed, setFailed] = useState(false)
   if (!slug || failed) {
     return <FallbackGlyph />
   }
   return (
     <img
-      src={`https://cdn.simpleicons.org/${slug}/${ICON_COLOR}`}
+      src={`https://cdn.simpleicons.org/${slug}/${iconColor}`}
       alt=""
       width={18}
       height={18}

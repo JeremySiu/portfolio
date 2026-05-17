@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Audio files — served from CloudFront, not committed to git
+public/songs/*.mp3

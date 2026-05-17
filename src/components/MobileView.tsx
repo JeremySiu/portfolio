@@ -1,8 +1,10 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useContext } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useContext, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ProjectsApp from './apps/ProjectsApp'
 import SkillsApp from './apps/SkillsApp'
 import ExperienceApp from './apps/ExperienceApp'
+import ResumeApp from './apps/ResumeApp'
+import ChessApp from './apps/ChessApp'
 import {
   MOBILE_FRIENDS_GALLERY,
   MOBILE_FRIENDS_ROTATE_INTERVAL_SEC,
@@ -17,8 +19,6 @@ const PHONE_NUMBER = '647 918 2181'
 const PHONE_NUMBER_TEL = '+16479182181'
 const EMAIL = 'jeremy.siu@gmail.com'
 
-const CHESS_WEB_URL = 'https://www.chess.com/play/online'
-const CLASH_ROYALE_WEB_URL = 'https://supercell.com/en/games/clashroyale/'
 const LINKEDIN_URL = 'https://www.linkedin.com/in/jeremy-siu/'
 const GITHUB_PROFILE_URL = 'https://github.com/JeremySiu'
 
@@ -55,6 +55,7 @@ const RASTER_APP_ICONS = {
   linkedin: '/icons/linkedIn.png',
   phone: '/icons/phone.png',
   email: '/icons/mail.png',
+  resume: '/icons/resume.png',
 } as const
 
 type RasterIconOptions = {
@@ -103,6 +104,12 @@ const APPS: AppDef[] = [
     background: 'linear-gradient(160deg, #c084fc 0%, #a855f7 55%, #7c3aed 100%)',
   },
   {
+    id: 'resume',
+    label: 'Resume',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.resume),
+    background: 'linear-gradient(180deg, #fde047 0%, #facc15 38%, #fafafa 38%, #e7e5e4 100%)',
+  },
+  {
     id: 'github',
     label: 'GitHub',
     Icon: rasterAppIcon(RASTER_APP_ICONS.github, { coverZoom: 1.42 }),
@@ -116,7 +123,7 @@ const APPS: AppDef[] = [
   },
   {
     id: 'clash',
-    label: 'Clash',
+    label: 'Clash Royale',
     Icon: rasterAppIcon(RASTER_APP_ICONS.clash),
     background: 'linear-gradient(160deg, #7dd3fc 0%, #0284c7 52%, #0c4a6e 100%)',
   },
@@ -142,8 +149,14 @@ const APPS: AppDef[] = [
 
 const DOCK_IDS = ['phone', 'email', 'github', 'projects']
 
-/** Apps tracked in iPad homework-style checklist widget (opening the app ticks the row). Resets on full page reload. */
-const IPAD_VISIT_CHECKLIST_IDS = ['projects', 'skills', 'experience', 'email'] as const
+/** Number of swipeable pages on the phone home screen. */
+const PHONE_TOTAL_PAGES = 3
+
+/**
+ * All possible checklist items in priority order — the widget renders as many
+ * as will fit within its available height, starting from the top.
+ */
+const IPAD_VISIT_CHECKLIST_IDS = ['projects', 'experience', 'resume', 'skills', 'email', 'github', 'linkedin'] as const
 
 const IPAD_VISIT_CHECKLIST_ITEMS: { id: string; label: string }[] = IPAD_VISIT_CHECKLIST_IDS.map((id) => ({
   id,
@@ -160,6 +173,13 @@ function normalizeIpadVisitChecklist(parsed: unknown): Record<string, boolean> {
   }
   return base
 }
+
+/** Fixed gap (px) between checklist rows — drives dynamic item fitting. */
+const CHECKLIST_ITEM_GAP_PX = 8
+/** Approximate rendered height (px) of a single checklist button row (vertical padding + text). */
+const CHECKLIST_ITEM_ROW_PX = 31
+/** Vertical padding inside the checklist content area (top + bottom). */
+const CHECKLIST_CONTENT_PAD_PX = 30
 
 // ─── Inline app screens ─────────────────────────────────────────────────────
 
@@ -522,158 +542,109 @@ function EmailApp() {
   )
 }
 
-function ChessApp() {
-  const surface = useContext(AppSurfaceContext)
-  const L = surface === 'light'
-  const titleColor = L ? '#18181b' : 'white'
-  const subColor = L ? 'rgba(24,24,27,0.65)' : 'rgba(255,255,255,0.5)'
+
+const CLASH_EASTER_EGGS = [
+  {
+    audio: '/clash%20audio/he-he-he-ha-clash-royale-deep-fried.mp3',
+    image: '/icons/hehehehaw.png',
+  },
+  {
+    audio: '/clash%20audio/hogriderscream.mp3',
+    image: '/icons/hog%20screaming.png',
+  },
+  {
+    audio: '/clash%20audio/clash-royale-piggy-dance.mp3',
+    image: '/icons/piggy%20dance.png',
+  },
+  {
+    audio: '/clash%20audio/crying-goblin-clash-royale.mp3',
+    image: '/icons/crying%20goblin.png',
+  },
+  {
+    audio: '/clash%20audio/goblin-mischievous-laugh.mp3',
+    image: '/icons/goblin%20laugh.webp',
+  },
+]
+
+function ClashEasterEgg({ onDone }: { onDone: () => void }) {
+  const imgRef = useRef<HTMLImageElement>(null)
+  const fadedRef = useRef(false)
+  const eggRef = useRef(CLASH_EASTER_EGGS[Math.floor(Math.random() * CLASH_EASTER_EGGS.length)])
+
+  useEffect(() => {
+    const img = imgRef.current
+    if (!img) return
+
+    // Local flag for this effect run — avoids StrictMode double-invocation poisoning the ref
+    let cancelled = false
+    fadedRef.current = false
+
+    const egg = eggRef.current
+    const audio = new Audio(egg.audio)
+
+    const startGrow = (duration: number) => {
+      if (cancelled || !imgRef.current) return
+      const remaining = Math.max(0.5, duration - audio.currentTime)
+      const el = imgRef.current
+      // Force a reflow so the browser commits opacity:0/scale(0) before adding the transition
+      el.getBoundingClientRect()
+      el.style.transition = `opacity ${remaining}s ease-out, transform ${remaining}s ease-out`
+      el.style.opacity = '1'
+      el.style.transform = 'scale(1)'
+    }
+
+    const startFade = () => {
+      if (cancelled || fadedRef.current || !imgRef.current) return
+      fadedRef.current = true
+      const el = imgRef.current
+      el.style.transition = 'opacity 0.35s ease-in'
+      el.style.opacity = '0'
+      setTimeout(() => onDone(), 350)
+    }
+
+    audio.addEventListener('loadedmetadata', () => startGrow(audio.duration))
+    audio.addEventListener('ended', () => startFade())
+
+    // Handle cached audio where loadedmetadata already fired
+    if (audio.readyState >= 1) {
+      startGrow(audio.duration || 5)
+    }
+
+    audio.play().catch(() => {})
+
+    return () => {
+      cancelled = true
+      audio.pause()
+      audio.src = ''
+    }
+  }, [])
 
   return (
     <div
       style={{
-        padding: '24px 24px 48px',
+        position: 'fixed',
+        inset: 0,
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        gap: 24,
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        zIndex: 9999,
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, paddingTop: 12 }}>
-        <div
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: 26,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(160deg, #e8cfa3 0%, #8b6914 50%, #3d2914 100%)',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-          }}
-        >
-          <img
-            src={RASTER_APP_ICONS.chess}
-            alt=""
-            width={56}
-            height={56}
-            draggable={false}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        </div>
-        <h2 style={{ color: titleColor, fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em' }}>Chess</h2>
-        <p
-          style={{
-            color: subColor,
-            textAlign: 'center',
-            fontSize: 14,
-            lineHeight: 1.6,
-            maxWidth: 280,
-          }}
-        >
-          Jump into live games online when you&apos;re taking a break from shipping code.
-        </p>
-      </div>
-      <motion.a
-        href={CHESS_WEB_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        whileTap={{ scale: 0.97 }}
+      <img
+        ref={imgRef}
+        src={eggRef.current.image}
+        alt="Clash easter egg"
+        draggable={false}
         style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          padding: '16px',
-          borderRadius: 16,
-          color: 'white',
-          fontWeight: 600,
-          fontSize: 16,
-          background: 'linear-gradient(135deg, #a67c52, #5c4033)',
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+          width: 480,
+          display: 'block',
+          opacity: 0,
+          transform: 'scale(0)',
         }}
-      >
-        Play on Chess.com ↗
-      </motion.a>
-    </div>
-  )
-}
-
-function ClashRoyaleApp() {
-  const surface = useContext(AppSurfaceContext)
-  const L = surface === 'light'
-  const titleColor = L ? '#18181b' : 'white'
-  const subColor = L ? 'rgba(24,24,27,0.65)' : 'rgba(255,255,255,0.5)'
-
-  return (
-    <div
-      style={{
-        padding: '24px 24px 48px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 24,
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, paddingTop: 12 }}>
-        <div
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: 26,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(160deg, #7dd3fc 0%, #0284c7 52%, #0c4a6e 100%)',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-          }}
-        >
-          <img
-            src={RASTER_APP_ICONS.clash}
-            alt=""
-            width={56}
-            height={56}
-            draggable={false}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        </div>
-        <h2 style={{ color: titleColor, fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em' }}>
-          Clash Royale
-        </h2>
-        <p
-          style={{
-            color: subColor,
-            textAlign: 'center',
-            fontSize: 14,
-            lineHeight: 1.6,
-            maxWidth: 280,
-          }}
-        >
-          Quick matches, decks, and the official game hub from Supercell — elixir refill not included.
-        </p>
-      </div>
-      <motion.a
-        href={CLASH_ROYALE_WEB_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        whileTap={{ scale: 0.97 }}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          padding: '16px',
-          borderRadius: 16,
-          color: 'white',
-          fontWeight: 600,
-          fontSize: 16,
-          background: 'linear-gradient(135deg, #0ea5e9, #0369a1)',
-        }}
-      >
-        Open Supercell hub ↗
-      </motion.a>
+      />
     </div>
   )
 }
@@ -966,6 +937,7 @@ function FriendsPhotoWidget({
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
+                objectPosition: slide.objectPosition ?? 'center',
                 display: 'block',
                 pointerEvents: 'none',
                 userSelect: 'none',
@@ -1127,6 +1099,16 @@ function MusicHomeWidget({
           src={track.coverUrl}
           alt=""
           draggable={false}
+          onError={
+            track.fallbackCoverUrl
+              ? (e) => {
+                  const img = e.currentTarget
+                  if (img.src !== track.fallbackCoverUrl) {
+                    img.src = track.fallbackCoverUrl!
+                  }
+                }
+              : undefined
+          }
           style={{
             width: '100%',
             height: '100%',
@@ -1159,7 +1141,9 @@ function MusicHomeWidget({
           fill="white"
           fillOpacity="0.9"
           style={
-            tabletBar === true ? { position: 'absolute', top: 6, right: 6 } : { position: 'absolute', top: 10, right: 12 }
+            tabletBar === true
+              ? { position: 'absolute', top: 6, right: 14 }
+              : { position: 'absolute', top: 10, right: 20 }
           }
         >
           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
@@ -1419,10 +1403,38 @@ function IpadPortfolioChecklistWidget({
   checked: Record<string, boolean>
   onToggle: (appId: string) => void
 }) {
-  const remaining = items.reduce((n, row) => n + (!(checked[row.id] ?? false) ? 1 : 0), 0)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLDivElement>(null)
+  const [containerH, setContainerH] = useState(0)
+  const [headerH, setHeaderH] = useState(0)
+
+  useEffect(() => {
+    const container = containerRef.current
+    const header = headerRef.current
+    if (!container || !header) return
+    const ro = new ResizeObserver(() => {
+      setContainerH(container.offsetHeight)
+      setHeaderH(header.offsetHeight)
+    })
+    ro.observe(container)
+    ro.observe(header)
+    return () => ro.disconnect()
+  }, [])
+
+  /** How many items fit in the available content area. Falls back to all items before first measurement. */
+  const maxVisible = useMemo(() => {
+    if (containerH === 0 || headerH === 0) return items.length
+    const available = containerH - headerH - CHECKLIST_CONTENT_PAD_PX
+    if (available <= 0) return 0
+    return Math.max(0, Math.floor((available + CHECKLIST_ITEM_GAP_PX) / (CHECKLIST_ITEM_ROW_PX + CHECKLIST_ITEM_GAP_PX)))
+  }, [containerH, headerH, items.length])
+
+  const visibleItems = items.slice(0, maxVisible)
+  const remaining = visibleItems.reduce((n, row) => n + (!(checked[row.id] ?? false) ? 1 : 0), 0)
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: 'relative',
         borderRadius: widgetRadius,
@@ -1435,6 +1447,7 @@ function IpadPortfolioChecklistWidget({
       }}
     >
       <div
+        ref={headerRef}
         style={{
           flexShrink: 0,
           padding: '12px 12px 5px',
@@ -1505,11 +1518,11 @@ function IpadPortfolioChecklistWidget({
           padding: '14px 10px 16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 6,
-          justifyContent: 'space-between',
+          gap: CHECKLIST_ITEM_GAP_PX,
+          justifyContent: 'flex-start',
         }}
       >
-        {items.map((row) => {
+        {visibleItems.map((row) => {
           const isDone = !!(checked[row.id] ?? false)
           return (
             <button
@@ -1535,6 +1548,7 @@ function IpadPortfolioChecklistWidget({
                 background: 'transparent',
                 cursor: 'pointer',
                 textAlign: 'left',
+                flexShrink: 0,
               }}
             >
               <span
@@ -1588,8 +1602,8 @@ const APP_CONTENT: Record<string, React.ReactNode> = {
   projects: <ProjectsApp />,
   skills: <SkillsApp />,
   experience: <ExperienceApp />,
+  resume: <ResumeApp />,
   chess: <ChessApp />,
-  clash: <ClashRoyaleApp />,
   phone: <PhoneApp />,
   email: <EmailApp />,
 }
@@ -1678,6 +1692,9 @@ export default function MobileView() {
   const [macFocusStack, setMacFocusStack] = useState<string[]>([])
   /** Order of extra (non-{@link DOCK_IDS}) dock icons — stable; not tied to window z-order. */
   const [macDockExtraOrder, setMacDockExtraOrder] = useState<string[]>([])
+  const [clashEasterEggActive, setClashEasterEggActive] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
+  const [phoneScrollH, setPhoneScrollH] = useState(0)
   const dockIconRefs = useRef<Partial<Record<string, HTMLButtonElement>>>({})
   const macTitleDragRef = useRef<{
     active: boolean
@@ -1691,6 +1708,9 @@ export default function MobileView() {
   const macFocusStackRef = useRef(macFocusStack)
   const phoneHomeScrollRef = useRef<HTMLDivElement>(null)
   const phoneHomeGridRef = useRef<HTMLDivElement>(null)
+  const phonePageTouchRef = useRef<{ startX: number; startY: number } | null>(null)
+  const ipadAppAreaRef = useRef<HTMLDivElement>(null)
+  const [ipadAppAreaSize, setIpadAppAreaSize] = useState({ w: 0, h: 0 })
   const { scale, viewportW, viewportH, desktopMacWindows } = useUILayout()
   const S = SIZES[scale]
 
@@ -1758,6 +1778,11 @@ export default function MobileView() {
 
   const openApp = useCallback(
     (appId: string, anchorEl?: HTMLElement | null) => {
+      if (appId === 'clash') {
+        setClashEasterEggActive(true)
+        return
+      }
+
       const externalUrl = APP_OPEN_IN_NEW_TAB[appId]
       if (externalUrl) {
         window.open(externalUrl, '_blank', 'noopener,noreferrer')
@@ -1884,6 +1909,7 @@ export default function MobileView() {
 
     const run = () => {
       const sr = scrollEl.getBoundingClientRect()
+      setPhoneScrollH(sr.height)
       const gr = gridEl.getBoundingClientRect()
       if (gr.bottom <= sr.top + 2) {
         setPhoneShowWelcomeNote(false)
@@ -1904,6 +1930,20 @@ export default function MobileView() {
       scrollEl.removeEventListener('scroll', run)
       window.removeEventListener('resize', run)
     }
+  }, [scale])
+
+  useLayoutEffect(() => {
+    if (scale !== 'ipad') return
+    const el = ipadAppAreaRef.current
+    if (!el) return
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      setIpadAppAreaSize({ w: r.width, h: r.height })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [scale])
 
   useEffect(() => {
@@ -1960,7 +2000,35 @@ export default function MobileView() {
   // Apps shown on the home grid (phone/email live only in the dock to keep the widget layout tight)
   const homeApps = APPS.filter((a) => a.id !== 'phone' && a.id !== 'email')
 
-  const homeAppButtons = homeApps.map((app, i) => (
+  // Phone page-split: rows 1-2 of the friends-widget grid only have 2 app slots each (cols 1-2);
+  // rows 3+ have 4 slots. Compute how many apps fit on page 1 based on the measured container height.
+  const phoneTileH = S.tileHeight ?? 76
+  const phoneRowGap = S.gridRowGap ?? 18
+  const phoneMaxRows =
+    phoneScrollH > 0
+      ? Math.max(1, Math.floor((phoneScrollH + phoneRowGap) / (phoneTileH + phoneRowGap)))
+      : 99
+  const phoneAppsPerPage1 = Math.min(phoneMaxRows, 2) * 2 + Math.max(0, phoneMaxRows - 2) * 4
+
+  // iPad page-split: apps flex-wrap in a bounded container; estimate rows × cols.
+  const ipadRowGap = S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX
+  // Row content height = icon + label gap + ~1.4× font size
+  const ipadRowContentH = S.appIconSize + S.appIconLabelGap + Math.ceil((S.appLabelFontSize ?? 12) * 1.4)
+  const ipadMaxRows =
+    ipadAppAreaSize.h > 0
+      ? Math.max(1, Math.floor((ipadAppAreaSize.h + ipadRowGap) / (ipadRowContentH + ipadRowGap)))
+      : 99
+  const ipadMaxCols =
+    ipadAppAreaSize.w > 0
+      ? Math.max(1, Math.floor((ipadAppAreaSize.w + ipadRowGap) / (S.appIconSize + ipadRowGap)))
+      : 99
+  const ipadAppsPerPage1 = ipadMaxRows * ipadMaxCols
+
+  const appsPerPage1 = scale === 'phone' ? phoneAppsPerPage1 : ipadAppsPerPage1
+  const page1Apps = homeApps.slice(0, appsPerPage1)
+  const page2Apps = homeApps.slice(appsPerPage1)
+
+  const makeAppButton = (app: AppDef, i: number) => (
     <motion.button
       key={app.id}
       initial={{ opacity: 0, scale: 0.7, y: 12 }}
@@ -2009,7 +2077,27 @@ export default function MobileView() {
         {app.label}
       </span>
     </motion.button>
-  ))
+  )
+
+  const page1AppButtons = page1Apps.map(makeAppButton)
+  const page2AppButtons = page2Apps.map(makeAppButton)
+
+  const handlePhoneTouchStart = useCallback((e: React.TouchEvent) => {
+    phonePageTouchRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY }
+  }, [])
+
+  const handlePhoneTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (!phonePageTouchRef.current) return
+      const dx = e.changedTouches[0].clientX - phonePageTouchRef.current.startX
+      const dy = e.changedTouches[0].clientY - phonePageTouchRef.current.startY
+      phonePageTouchRef.current = null
+      if (Math.abs(dx) < Math.abs(dy) || Math.abs(dx) < 40) return
+      if (dx < 0) setCurrentPage((p) => Math.min(p + 1, PHONE_TOTAL_PAGES - 1))
+      else setCurrentPage((p) => Math.max(p - 1, 0))
+    },
+    [],
+  )
 
   return (
     <div
@@ -2079,164 +2167,282 @@ export default function MobileView() {
           flexDirection: 'column',
           padding: S.homeBodyPadding,
           overflowX: 'hidden',
-          overflowY: scale === 'phone' ? 'hidden' : 'auto',
+          overflowY: 'hidden',
           minHeight: 0,
         }}
       >
         {scale === 'phone' ? (
+          /* ── Paged horizontal slider (phone only) ───────────────────── */
           <div
-            ref={phoneHomeScrollRef}
-            style={{
-              flex: 1,
-              minHeight: 0,
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
-            }}
+            onTouchStart={handlePhoneTouchStart}
+            onTouchEnd={handlePhoneTouchEnd}
+            style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}
           >
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: S.gridRowGap ?? 14,
-              }}
-            >
-              <div
-                ref={phoneHomeGridRef}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns:
-                    S.cellWidth != null && S.gridCols != null
-                      ? `repeat(${S.gridCols}, ${S.cellWidth}px)`
-                      : `repeat(${S.gridCols ?? 4}, 1fr)`,
-                  gridAutoRows: `minmax(0, ${S.tileHeight ?? 76}px)`,
-                  columnGap: S.gridColGap ?? 14,
-                  rowGap: S.gridRowGap ?? 14,
-                  justifyContent: S.cellWidth != null ? 'center' : 'stretch',
-                }}
-              >
-                {homeAppButtons}
-                <FriendsPhotoWidget
-                  widgetRadius={S.widgetRadius}
-                  wrapperStyle={{ gridArea: S.friendsArea }}
-                />
-              </div>
-              {phoneShowWelcomeNote ? (
-                <PortfolioNoteWidget
-                  dense
-                  widgetRadius={S.widgetRadius}
-                  shellStyle={WELCOME_NOTE_PHONE_SHELL_STYLE}
-                  bodyFontSize={12}
-                />
-              ) : null}
-              <div>
-                <MusicHomeWidget
-                  widgetRadius={S.widgetRadius}
-                  maxWidth={S.musicMaxWidth}
-                  wrapperStyle={{
-                    width: '100%',
-                    height: TABLET_MUSIC_BAR_HEIGHT_PX,
-                    flexShrink: 0,
-                    alignSelf: 'stretch',
-                    alignItems: 'stretch',
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {/* iPad/desktop — left stack fills height to dock; checklist grows in that column */}
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'row',
-                alignItems: 'stretch',
-                gap: S.ipadAppsToWidgetsGap ?? TABLET_TILE_GUTTER_PX,
-                flex: 1,
-                minHeight: 0,
-                width: '100%',
+                height: '100%',
+                width: `${PHONE_TOTAL_PAGES * 100}%`,
+                transform: `translateX(-${(currentPage * 100) / PHONE_TOTAL_PAGES}%)`,
+                transition: 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                willChange: 'transform',
               }}
             >
+              {/* Page 0 — Home */}
               <div
+                ref={phoneHomeScrollRef}
                 style={{
+                  width: `${100 / PHONE_TOTAL_PAGES}%`,
+                  height: '100%',
                   flexShrink: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: TABLET_NOTE_TO_CHECKLIST_GAP_PX,
-                  alignSelf: 'stretch',
-                  minHeight: 0,
+                  overflowY: 'auto',
+                  WebkitOverflowScrolling: 'touch',
                 }}
               >
-                <PortfolioNoteWidget
-                  widgetRadius={S.widgetRadius}
-                  shellStyle={WELCOME_NOTE_TABLET_SHELL_STYLE}
-                  bodyFontSize={13}
-                />
-                <IpadPortfolioChecklistWidget
-                  widgetRadius={S.widgetRadius}
-                  shellStyle={IPAD_HOME_CHECKLIST_SHELL_STYLE}
-                  items={IPAD_VISIT_CHECKLIST_ITEMS}
-                  checked={ipadVisitChecked}
-                  onToggle={toggleIpadVisitChecklistRow}
-                />
-              </div>
-              <div
-                style={{
-                  flex: '1 1 0',
-                  minWidth: 0,
-                  alignSelf: 'flex-start',
-                  display: 'flex',
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  alignContent: 'flex-start',
-                  justifyContent: 'flex-start',
-                  alignItems: 'flex-start',
-                  columnGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
-                  rowGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
-                }}
-              >
-                {homeAppButtons}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: S.gridRowGap ?? 14,
+                  }}
+                >
+                  <div
+                    ref={phoneHomeGridRef}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns:
+                        S.cellWidth != null && S.gridCols != null
+                          ? `repeat(${S.gridCols}, ${S.cellWidth}px)`
+                          : `repeat(${S.gridCols ?? 4}, 1fr)`,
+                      gridAutoRows: 'auto',
+                      columnGap: S.gridColGap ?? 14,
+                      rowGap: S.gridRowGap ?? 14,
+                      justifyContent: S.cellWidth != null ? 'center' : 'stretch',
+                    }}
+                  >
+                    {page1AppButtons}
+                    <FriendsPhotoWidget
+                      widgetRadius={S.widgetRadius}
+                      wrapperStyle={{ gridArea: S.friendsArea }}
+                    />
+                  </div>
+                  {phoneShowWelcomeNote ? (
+                    <PortfolioNoteWidget
+                      dense
+                      widgetRadius={S.widgetRadius}
+                      shellStyle={WELCOME_NOTE_PHONE_SHELL_STYLE}
+                      bodyFontSize={12}
+                    />
+                  ) : null}
+                  <div>
+                    <MusicHomeWidget
+                      widgetRadius={S.widgetRadius}
+                      maxWidth={S.musicMaxWidth}
+                      wrapperStyle={{
+                        width: '100%',
+                        height: TABLET_MUSIC_BAR_HEIGHT_PX,
+                        flexShrink: 0,
+                        alignSelf: 'stretch',
+                        alignItems: 'stretch',
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
 
+              {/* Page 1 — Overflow apps */}
               <div
                 style={{
+                  width: `${100 / PHONE_TOTAL_PAGES}%`,
+                  height: '100%',
                   flexShrink: 0,
-                  width: TABLET_WIDGET_STRIP_CLAMP,
-                  alignSelf: 'flex-start',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: S.ipadWidgetStackGap ?? 24,
+                  overflowY: 'auto',
+                  WebkitOverflowScrolling: 'touch',
                 }}
               >
-                <FriendsPhotoWidget
-                  widgetRadius={S.widgetRadius}
-                  wrapperStyle={{
-                    width: '100%',
-                    flexShrink: 0,
-                    height: 'clamp(228px, 34vh, 320px)',
-                  }}
-                />
-                <MusicHomeWidget
-                  tabletBar
-                  widgetRadius={S.widgetRadius}
-                  maxWidth={null}
-                  wrapperStyle={{
-                    width: '100%',
-                    height: TABLET_MUSIC_BAR_HEIGHT_PX,
-                    flexShrink: 0,
-                    alignItems: 'stretch',
-                  }}
-                />
+                {page2Apps.length > 0 && (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns:
+                        S.cellWidth != null && S.gridCols != null
+                          ? `repeat(${S.gridCols}, ${S.cellWidth}px)`
+                          : `repeat(${S.gridCols ?? 4}, 1fr)`,
+                      gridAutoRows: 'auto',
+                      columnGap: S.gridColGap ?? 14,
+                      rowGap: S.gridRowGap ?? 14,
+                      justifyContent: S.cellWidth != null ? 'center' : 'stretch',
+                    }}
+                  >
+                    {page2AppButtons}
+                  </div>
+                )}
               </div>
+
+              {/* Pages 2+ — Empty */}
+              {Array.from({ length: PHONE_TOTAL_PAGES - 2 }, (_, i) => (
+                <div
+                  key={i}
+                  style={{ width: `${100 / PHONE_TOTAL_PAGES}%`, height: '100%', flexShrink: 0 }}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* ── Paged horizontal slider (iPad / desktop) ───────────────── */
+          <div
+            onTouchStart={handlePhoneTouchStart}
+            onTouchEnd={handlePhoneTouchEnd}
+            style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'row',
+                height: '100%',
+                width: `${PHONE_TOTAL_PAGES * 100}%`,
+                transform: `translateX(-${(currentPage * 100) / PHONE_TOTAL_PAGES}%)`,
+                transition: 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                willChange: 'transform',
+              }}
+            >
+              {/* Page 0 — iPad home */}
+              <div
+                style={{
+                  width: `${100 / PHONE_TOTAL_PAGES}%`,
+                  height: '100%',
+                  flexShrink: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                {/* iPad/desktop — left stack fills height to dock; checklist grows in that column */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'stretch',
+                    gap: S.ipadAppsToWidgetsGap ?? TABLET_TILE_GUTTER_PX,
+                    flex: 1,
+                    minHeight: 0,
+                    width: '100%',
+                  }}
+                >
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: TABLET_NOTE_TO_CHECKLIST_GAP_PX,
+                      alignSelf: 'stretch',
+                      minHeight: 0,
+                    }}
+                  >
+                    <PortfolioNoteWidget
+                      widgetRadius={S.widgetRadius}
+                      shellStyle={WELCOME_NOTE_TABLET_SHELL_STYLE}
+                      bodyFontSize={13}
+                    />
+                    <IpadPortfolioChecklistWidget
+                      widgetRadius={S.widgetRadius}
+                      shellStyle={IPAD_HOME_CHECKLIST_SHELL_STYLE}
+                      items={IPAD_VISIT_CHECKLIST_ITEMS}
+                      checked={ipadVisitChecked}
+                      onToggle={toggleIpadVisitChecklistRow}
+                    />
+                  </div>
+                  <div
+                    ref={ipadAppAreaRef}
+                    style={{
+                      flex: '1 1 0',
+                      minWidth: 0,
+                      alignSelf: 'stretch',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      alignContent: 'flex-start',
+                      justifyContent: 'flex-start',
+                      alignItems: 'flex-start',
+                      columnGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
+                      rowGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
+                    }}
+                  >
+                    {page1AppButtons}
+                  </div>
+
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      width: TABLET_WIDGET_STRIP_CLAMP,
+                      alignSelf: 'flex-start',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: S.ipadWidgetStackGap ?? 24,
+                    }}
+                  >
+                    <FriendsPhotoWidget
+                      widgetRadius={S.widgetRadius}
+                      wrapperStyle={{
+                        width: '100%',
+                        flexShrink: 0,
+                        height: 'clamp(228px, 34vh, 320px)',
+                      }}
+                    />
+                    <MusicHomeWidget
+                      tabletBar
+                      widgetRadius={S.widgetRadius}
+                      maxWidth={null}
+                      wrapperStyle={{
+                        width: '100%',
+                        height: TABLET_MUSIC_BAR_HEIGHT_PX,
+                        flexShrink: 0,
+                        alignItems: 'stretch',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Page 1 — Overflow apps */}
+              <div
+                style={{
+                  width: `${100 / PHONE_TOTAL_PAGES}%`,
+                  height: '100%',
+                  flexShrink: 0,
+                  overflowY: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  padding: S.homeBodyPadding,
+                  boxSizing: 'border-box',
+                }}
+              >
+                {page2Apps.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      alignContent: 'flex-start',
+                      justifyContent: 'flex-start',
+                      alignItems: 'flex-start',
+                      columnGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
+                      rowGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
+                    }}
+                  >
+                    {page2AppButtons}
+                  </div>
+                )}
+              </div>
+
+              {/* Pages 2+ — Empty */}
+              {Array.from({ length: PHONE_TOTAL_PAGES - 2 }, (_, i) => (
+                <div
+                  key={i}
+                  style={{ width: `${100 / PHONE_TOTAL_PAGES}%`, height: '100%', flexShrink: 0 }}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -2266,9 +2472,25 @@ export default function MobileView() {
             <circle cx="11" cy="11" r="6" fill="none" stroke="white" strokeWidth="1.6" />
             <path d="m15.5 15.5 3 3" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'white', opacity: 0.95 }} />
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'white', opacity: 0.45 }} />
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'white', opacity: 0.45 }} />
+          {Array.from({ length: PHONE_TOTAL_PAGES }, (_, i) => (
+            <div
+              key={i}
+              role="button"
+              tabIndex={0}
+              aria-label={`Page ${i + 1}`}
+              onClick={() => setCurrentPage(i)}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setCurrentPage(i)}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'white',
+                opacity: currentPage === i ? 0.95 : 0.45,
+                cursor: 'pointer',
+                transition: 'opacity 0.2s',
+              }}
+            />
+          ))}
         </div>
 
         <div
@@ -2662,6 +2884,10 @@ export default function MobileView() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      {clashEasterEggActive && (
+        <ClashEasterEgg onDone={() => setClashEasterEggActive(false)} />
+      )}
     </div>
   )
 }
