@@ -5,6 +5,8 @@ import SkillsApp from './apps/SkillsApp'
 import ExperienceApp from './apps/ExperienceApp'
 import ResumeApp from './apps/ResumeApp'
 import ChessApp from './apps/ChessApp'
+import PianoTilesApp from './apps/PianoTilesApp'
+import OrsusHealthApp, { SafariToolbar, SafariReloadButton } from './apps/OrsusHealthApp'
 import {
   MOBILE_FRIENDS_GALLERY,
   MOBILE_FRIENDS_ROTATE_INTERVAL_SEC,
@@ -52,6 +54,8 @@ const RASTER_APP_ICONS = {
   github: '/icons/github.webp',
   chess: '/icons/chess.png',
   clash: '/icons/clash.png',
+  pianoTiles: '/icons/piano%20tiles.png',
+  orsusHealth: '/icons/BooHooLogo.png',
   linkedin: '/icons/linkedIn.png',
   phone: '/icons/phone.png',
   email: '/icons/mail.png',
@@ -126,6 +130,18 @@ const APPS: AppDef[] = [
     label: 'Clash Royale',
     Icon: rasterAppIcon(RASTER_APP_ICONS.clash),
     background: 'linear-gradient(160deg, #7dd3fc 0%, #0284c7 52%, #0c4a6e 100%)',
+  },
+  {
+    id: 'pianoTiles',
+    label: 'Piano Tiles',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.pianoTiles),
+    background: 'linear-gradient(160deg, #c084fc 0%, #7c3aed 50%, #4c1d95 100%)',
+  },
+  {
+    id: 'orsusHealth',
+    label: 'OrsusHealth',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.orsusHealth),
+    background: 'linear-gradient(160deg, #ffffff 0%, #eaf6f6 55%, #cfe9ea 100%)',
   },
   {
     id: 'linkedin',
@@ -1604,6 +1620,7 @@ const APP_CONTENT: Record<string, React.ReactNode> = {
   experience: <ExperienceApp />,
   resume: <ResumeApp />,
   chess: <ChessApp />,
+  pianoTiles: <PianoTilesApp />,
   phone: <PhoneApp />,
   email: <EmailApp />,
 }
@@ -1766,6 +1783,15 @@ export default function MobileView() {
   const closeMobileAppOverlay = useCallback(() => {
     setActiveApp(null)
   }, [])
+
+  /** Renders an app's content, injecting a context-appropriate close handler for apps that need to close themselves. */
+  const renderAppContent = useCallback(
+    (appId: string, onClose: () => void) => {
+      if (appId === 'orsusHealth') return <OrsusHealthApp onClose={onClose} />
+      return APP_CONTENT[appId] ?? null
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!desktopMacWindows) {
@@ -2682,7 +2708,7 @@ export default function MobileView() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 12,
-                      padding: '10px 14px',
+                      padding: macAppId === 'orsusHealth' ? '5px 14px' : '10px 14px',
                       background: 'linear-gradient(180deg, #ececed 0%, #e2e2e4 100%)',
                       borderBottom: '1px solid rgba(0,0,0,0.09)',
                       cursor: session.maximized ? 'default' : 'grab',
@@ -2758,20 +2784,24 @@ export default function MobileView() {
                         }}
                       />
                     </div>
-                    <span
-                      id={`mac-window-title-${macAppId}`}
-                      style={{
-                        flex: 1,
-                        textAlign: 'center',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: '#2d2d2f',
-                        letterSpacing: '-0.02em',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      {appDef.label}
-                    </span>
+                    {macAppId === 'orsusHealth' ? (
+                      <SafariToolbar />
+                    ) : (
+                      <span
+                        id={`mac-window-title-${macAppId}`}
+                        style={{
+                          flex: 1,
+                          textAlign: 'center',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          color: '#2d2d2f',
+                          letterSpacing: '-0.02em',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        {appDef.label}
+                      </span>
+                    )}
                     <div style={{ width: 52 }} />
                   </div>
                   <AppSurfaceContext.Provider value="light">
@@ -2786,7 +2816,7 @@ export default function MobileView() {
                         background: '#ececed',
                       }}
                     >
-                      {APP_CONTENT[macAppId] ?? null}
+                      {renderAppContent(macAppId, () => quitMacSession(macAppId))}
                     </div>
                   </AppSurfaceContext.Provider>
                 </motion.div>
@@ -2833,7 +2863,7 @@ export default function MobileView() {
                 flexShrink: 0,
                 display: 'flex',
                 alignItems: 'center',
-                padding: '12px 16px',
+                padding: activeApp === 'orsusHealth' ? '8px 16px' : '12px 16px',
                 borderBottom: '1px solid rgba(255,255,255,0.08)',
               }}
             >
@@ -2864,22 +2894,33 @@ export default function MobileView() {
                 </svg>
                 <span style={{ marginLeft: 2 }}>Home</span>
               </motion.button>
-              <div
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <span style={{ color: 'white', fontWeight: 600, fontSize: 16 }}>
-                  {activeAppDef?.label}
-                </span>
-              </div>
-              <div style={{ width: 62 }} />
+              {activeApp === 'orsusHealth' ? (
+                <>
+                  <div style={{ width: 12, flexShrink: 0 }} />
+                  <SafariToolbar tone="onDark" showReload={false} />
+                  <div style={{ width: 8, flexShrink: 0 }} />
+                  <SafariReloadButton tone="onDark" />
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <span style={{ color: 'white', fontWeight: 600, fontSize: 16 }}>
+                      {activeAppDef?.label}
+                    </span>
+                  </div>
+                  <div style={{ width: 62 }} />
+                </>
+              )}
             </div>
             <div className="window-body" style={{ flex: 1, overflowY: 'auto' }}>
-              {activeApp ? APP_CONTENT[activeApp] : null}
+              {activeApp ? renderAppContent(activeApp, closeMobileAppOverlay) : null}
             </div>
           </motion.div>
         ) : null}
