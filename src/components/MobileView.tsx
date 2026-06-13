@@ -7,6 +7,10 @@ import ResumeApp from './apps/ResumeApp'
 import ChessApp from './apps/ChessApp'
 import PianoTilesApp from './apps/PianoTilesApp'
 import OrsusHealthApp, { SafariToolbar, SafariReloadButton } from './apps/OrsusHealthApp'
+import LostInTranslationApp, {
+  SafariToolbar as LitSafariToolbar,
+  SafariReloadButton as LitSafariReloadButton,
+} from './apps/LostInTranslationApp'
 import {
   MOBILE_FRIENDS_GALLERY,
   MOBILE_FRIENDS_ROTATE_INTERVAL_SEC,
@@ -56,6 +60,7 @@ const RASTER_APP_ICONS = {
   clash: '/icons/clash.png',
   pianoTiles: '/icons/piano%20tiles.png',
   orsusHealth: '/icons/BooHooLogo.png',
+  lostInTranslation: '/icons/Lost-In-Translation.png',
   linkedin: '/icons/linkedIn.png',
   phone: '/icons/phone.png',
   email: '/icons/mail.png',
@@ -139,9 +144,15 @@ const APPS: AppDef[] = [
   },
   {
     id: 'orsusHealth',
-    label: 'OrsusHealth',
+    label: 'Orsus Health',
     Icon: rasterAppIcon(RASTER_APP_ICONS.orsusHealth),
     background: 'linear-gradient(160deg, #ffffff 0%, #eaf6f6 55%, #cfe9ea 100%)',
+  },
+  {
+    id: 'lostInTranslation',
+    label: 'Lost in Translation',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.lostInTranslation),
+    background: 'linear-gradient(160deg, #ffffff 0%, #fff7e6 55%, #fde9b8 100%)',
   },
   {
     id: 'linkedin',
@@ -680,10 +691,15 @@ type UIScale = 'phone' | 'ipad'
 /**
  * Dedicated widget column — widen slightly so the condensed music row feels “horizontal”.
  */
-const TABLET_WIDGET_STRIP_CLAMP = 'clamp(292px, 26vw, 352px)' as const
+const TABLET_WIDGET_STRIP_CLAMP = 'clamp(240px, 33vw, 360px)' as const
 
-/** Approximate gutters between tablet home tiles (~1.3× icon size → reference-style air). */
-const TABLET_TILE_GUTTER_PX = 84
+/**
+ * Gutter between tablet home columns / wrapping app icons. Kept tight so the app column has
+ * room to fit (apps appear at 768px) and lands on 2 columns around 1024px, while keeping the
+ * icons comfortably close together.
+ */
+const TABLET_TILE_GUTTER_PX = 28
+
 
 interface UISizeSet {
   statusBarHeight: number
@@ -733,10 +749,12 @@ const SIZES: Record<UIScale, UISizeSet> = {
     showNotch: true,
     notchWidth: 124,
     notchHeight: 32,
-    homeBodyPadding: '20px 22px 4px',
+    homeBodyPadding: '20px 0 4px',
     gridCols: 4,
+    // Icon-sized columns with space-evenly so the full viewport width is used and the
+    // gap between any two adjacent icons equals the gap from the viewport edge to the first/last icon.
     cellWidth: null,
-    gridColGap: 14,
+    gridColGap: 0,
     gridRowGap: 18,
     tileHeight: 76,
     friendsArea: '1 / 3 / 3 / 5',
@@ -763,11 +781,12 @@ const SIZES: Record<UIScale, UISizeSet> = {
     showNotch: false,
     notchWidth: 0,
     notchHeight: 0,
-    homeBodyPadding: '32px 48px 12px',
-    /** Same gutter as between app icons → even rhythm into the widgets. */
-    ipadAppsToWidgetsGap: TABLET_TILE_GUTTER_PX,
+    homeBodyPadding: '32px 28px 12px',
+    // 0 outer gap — the 1fr grid cells provide equal spacing from widget edge to first icon,
+    // matching the spacing between adjacent icon columns (true even distribution).
+    ipadAppsToWidgetsGap: 0,
     ipadWidgetStackGap: 24,
-    ipadAppWrapGap: TABLET_TILE_GUTTER_PX,
+    ipadAppWrapGap: 84,
     appIconSize: 64,
     appIconRadius: 15,
     appIconSvgSize: 38,
@@ -790,13 +809,13 @@ const TABLET_MUSIC_BAR_HEIGHT_PX =
   (SIZES.phone.tileHeight ?? 76) * 2 + (SIZES.phone.gridRowGap ?? 14)
 
 /**
- * Welcome note widget on phone — only rendered when the scroll viewport (scrollTop 0) has at
- * least this much vertical space below the app grid to fit the note stack (note + row + music).
+ * Welcome note widget on phone — only rendered when the scroll viewport has at least this much
+ * vertical space below the app grid. Music widget is pinned outside the scroll area so its
+ * height is no longer included here.
  */
 const PHONE_WELCOME_NOTE_MIN_SPACE_BELOW_GRID_PX =
   232 +
-  (SIZES.phone.gridRowGap ?? 14) +
-  TABLET_MUSIC_BAR_HEIGHT_PX
+  (SIZES.phone.gridRowGap ?? 14)
 
 /** Gallery strip width — note widget matches this on tablet for parity with Friends widget. */
 const WELCOME_NOTE_TABLET_SHELL_STYLE: React.CSSProperties = {
@@ -874,42 +893,73 @@ function FriendsPhotoWidget({
   wrapperStyle?: React.CSSProperties
 }) {
   const slides = MOBILE_FRIENDS_GALLERY
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [active, setActive] = useState(0)
+  const total = slides.length
+  // Infinite carousel: strip = [clone_of_last, ...real_slides, clone_of_first]
+  // stripIndex 0 = clone of last, 1..total = real slides, total+1 = clone of first
+  const [stripIndex, setStripIndex] = useState(1)
+  const [instant, setInstant] = useState(false)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
 
-  const scrollTo = (i: number) => {
-    const el = scrollRef.current
-    if (!el) return
-    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  // Which real slide dot to highlight (0-based)
+  const activeDot = ((stripIndex - 1) % total + total) % total
+
+  const SLIDE_MS = 350
+
+  /**
+   * Slide to strip position `idx`. If it's a clone (0 or total+1),
+   * schedule an instant jump back to the real counterpart once the
+   * slide animation finishes.
+   */
+  const slideTo = (idx: number) => {
+    setInstant(false)
+    setStripIndex(idx)
+    if (idx === 0 || idx === total + 1) {
+      setTimeout(() => {
+        setInstant(true)
+        setStripIndex(idx === 0 ? total : 1)
+        requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)))
+      }, SLIDE_MS)
+    }
   }
 
   useEffect(() => {
-    if (slides.length <= 1) return
+    if (total <= 1) return
     const id = window.setInterval(() => {
-      setActive((i) => {
-        const next = (i + 1) % slides.length
-        scrollTo(next)
+      setStripIndex((i) => {
+        const next = i + 1
+        if (next === total + 1) {
+          // Slide to clone of first, then silently jump back to real first
+          setTimeout(() => {
+            setInstant(true)
+            setStripIndex(1)
+            requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)))
+          }, SLIDE_MS)
+        }
         return next
       })
     }, MOBILE_FRIENDS_ROTATE_INTERVAL_SEC * 1000)
     return () => clearInterval(id)
-  }, [slides.length])
+  }, [total])
 
-  const onScroll = () => {
-    const el = scrollRef.current
-    if (!el || !el.clientWidth) return
-    const i = Math.round(el.scrollLeft / el.clientWidth)
-    setActive(Math.max(0, Math.min(slides.length - 1, i)))
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation()
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
   }
 
-  const jumpTo = (i: number) => {
-    if (!slides.length) return
-    const next = ((i % slides.length) + slides.length) % slides.length
-    setActive(next)
-    scrollTo(next)
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation()
+    if (!touchStartRef.current) return
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y
+    touchStartRef.current = null
+    if (Math.abs(dx) < Math.abs(dy) || Math.abs(dx) < 30) return
+    slideTo(dx < 0 ? stripIndex + 1 : stripIndex - 1)
   }
 
-  if (!slides.length) return null
+  if (!total) return null
+
+  const extendedSlides = [slides[total - 1], ...slides, slides[0]]
+  const stripTotal = total + 2
 
   return (
     <div
@@ -921,49 +971,53 @@ function FriendsPhotoWidget({
       }}
     >
       <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="widget-strip-scroll"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         style={{
-          display: 'flex',
           width: '100%',
           height: '100%',
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          scrollSnapType: 'x mandatory',
-          WebkitOverflowScrolling: 'touch',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
-        {slides.map((slide, i) => (
-          <div
-            key={`${slide.src}-${i}`}
-            style={{
-              flex: '0 0 100%',
-              width: '100%',
-              height: '100%',
-              scrollSnapAlign: 'start',
-              scrollSnapStop: 'always',
-            }}
-          >
-            <img
-              src={slide.src}
-              alt={slide.alt ?? ''}
-              draggable={false}
+        <div
+          style={{
+            display: 'flex',
+            width: `${stripTotal * 100}%`,
+            height: '100%',
+            transform: `translateX(-${(stripIndex * 100) / stripTotal}%)`,
+            transition: instant ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            willChange: 'transform',
+          }}
+        >
+          {extendedSlides.map((slide, i) => (
+            <div
+              key={i}
               style={{
-                width: '100%',
+                flex: `0 0 ${100 / stripTotal}%`,
                 height: '100%',
-                objectFit: 'cover',
-                objectPosition: slide.objectPosition ?? 'center',
-                display: 'block',
-                pointerEvents: 'none',
-                userSelect: 'none',
               }}
-            />
-          </div>
-        ))}
+            >
+              <img
+                src={slide.src}
+                alt={slide.alt ?? ''}
+                draggable={false}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: slide.objectPosition ?? 'center',
+                  display: 'block',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
-      {slides.length > 1 ? (
+      {total > 1 ? (
         <div
           style={{
             display: 'flex',
@@ -983,14 +1037,14 @@ function FriendsPhotoWidget({
               type="button"
               whileTap={{ scale: 0.8 }}
               aria-label={`Show photo ${i + 1}`}
-              aria-current={i === active}
-              onClick={() => jumpTo(i)}
+              aria-current={i === activeDot}
+              onClick={() => slideTo(i + 1)}
               style={{
-                width: i === active ? 9 : 7,
-                height: i === active ? 9 : 7,
+                width: i === activeDot ? 9 : 7,
+                height: i === activeDot ? 9 : 7,
                 borderRadius: 999,
                 background: 'white',
-                opacity: i === active ? 1 : 0.55,
+                opacity: i === activeDot ? 1 : 0.55,
                 border: 'none',
                 padding: 0,
                 cursor: 'pointer',
@@ -1728,6 +1782,8 @@ export default function MobileView() {
   const phonePageTouchRef = useRef<{ startX: number; startY: number } | null>(null)
   const ipadAppAreaRef = useRef<HTMLDivElement>(null)
   const [ipadAppAreaSize, setIpadAppAreaSize] = useState({ w: 0, h: 0 })
+  const ipadPage2GridRef = useRef<HTMLDivElement>(null)
+  const [ipadPage2W, setIpadPage2W] = useState(0)
   const { scale, viewportW, viewportH, desktopMacWindows } = useUILayout()
   const S = SIZES[scale]
 
@@ -1788,6 +1844,7 @@ export default function MobileView() {
   const renderAppContent = useCallback(
     (appId: string, onClose: () => void) => {
       if (appId === 'orsusHealth') return <OrsusHealthApp onClose={onClose} />
+      if (appId === 'lostInTranslation') return <LostInTranslationApp onClose={onClose} />
       return APP_CONTENT[appId] ?? null
     },
     [],
@@ -1972,6 +2029,17 @@ export default function MobileView() {
     return () => ro.disconnect()
   }, [scale])
 
+  useLayoutEffect(() => {
+    if (scale !== 'ipad') return
+    const el = ipadPage2GridRef.current
+    if (!el) return
+    const measure = () => setIpadPage2W(el.getBoundingClientRect().width)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [scale])
+
   useEffect(() => {
     const fmt = () => {
       const now = new Date()
@@ -2037,18 +2105,40 @@ export default function MobileView() {
   const phoneAppsPerPage1 = Math.min(phoneMaxRows, 2) * 2 + Math.max(0, phoneMaxRows - 2) * 4
 
   // iPad page-split: apps flex-wrap in a bounded container; estimate rows × cols.
-  const ipadRowGap = S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX
-  // Row content height = icon + label gap + ~1.4× font size
-  const ipadRowContentH = S.appIconSize + S.appIconLabelGap + Math.ceil((S.appLabelFontSize ?? 12) * 1.4)
-  const ipadMaxRows =
-    ipadAppAreaSize.h > 0
+  // At tablet widths (768–1023px): 1 column, exactly 3 apps, space-evenly vertical distribution.
+  // At laptop widths (≥1024px): dynamic multi-column grid with the large row gap.
+  const isTablet = scale === 'ipad' && viewportW < 1024
+  // Row content height = icon + label gap + label minHeight (2 lines × lineHeight 1.2).
+  // Must match the `minHeight` used on the label span in makeAppButton so that apps whose
+  // labels wrap to 2 lines don't get clipped at the bottom of the last visible row.
+  const ipadRowContentH = S.appIconSize + S.appIconLabelGap + Math.round((S.appLabelFontSize ?? 12) * 1.2 * 2)
+  // Page-1 row gap: 0 for tablet (alignContent space-evenly handles spacing), laptop keeps 84px.
+  const ipadRowGap = isTablet ? 0 : (S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX)
+  const ipadMaxRows = isTablet
+    ? 3
+    : ipadAppAreaSize.h > 0
       ? Math.max(1, Math.floor((ipadAppAreaSize.h + ipadRowGap) / (ipadRowContentH + ipadRowGap)))
       : 99
-  const ipadMaxCols =
-    ipadAppAreaSize.w > 0
+  const ipadMaxCols = isTablet
+    ? 1
+    : ipadAppAreaSize.w > 0
       ? Math.max(1, Math.floor((ipadAppAreaSize.w + ipadRowGap) / (S.appIconSize + ipadRowGap)))
       : 99
-  const ipadAppsPerPage1 = ipadMaxRows * ipadMaxCols
+  // Clamp to [1, 4]: prevents too many cramped columns on wide viewports while ensuring at
+  // least 1 column on narrow ones.
+  const ipadCols = isTablet ? 1 : Math.max(1, Math.min(4, ipadMaxCols))
+  const ipadAppsPerPage1 = ipadMaxRows * ipadCols
+
+  // Page 2 always uses the full desktop gap regardless of breakpoint — no widget constraints,
+  // full width available, and spacing should match the laptop view for consistency.
+  const ipadPage2Gap = S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX
+  // Page 2 has no widgets, so the full content width is available. Recalculate columns based on
+  // the measured grid width (which reflects the padding-adjusted container size).
+  const ipadPage2MaxCols =
+    ipadPage2W > 0
+      ? Math.max(1, Math.floor((ipadPage2W + ipadPage2Gap) / (S.appIconSize + ipadPage2Gap)))
+      : 99
+  const ipadPage2Cols = Math.max(1, Math.min(4, ipadPage2MaxCols))
 
   const appsPerPage1 = scale === 'phone' ? phoneAppsPerPage1 : ipadAppsPerPage1
   const page1Apps = homeApps.slice(0, appsPerPage1)
@@ -2098,6 +2188,11 @@ export default function MobileView() {
           letterSpacing: '-0.01em',
           lineHeight: 1.2,
           textAlign: 'center',
+          maxWidth: S.appIconSize,
+          minHeight: Math.round(S.appLabelFontSize * 1.2 * 2),
+          whiteSpace: 'normal',
+          overflowWrap: 'break-word',
+          wordBreak: 'break-word',
         }}
       >
         {app.label}
@@ -2107,6 +2202,12 @@ export default function MobileView() {
 
   const page1AppButtons = page1Apps.map(makeAppButton)
   const page2AppButtons = page2Apps.map(makeAppButton)
+
+  // Horizontal padding for phone widgets (note, music) so their edges align with the
+  // leftmost/rightmost icon column in the space-evenly grid.
+  // With space-evenly: gap = (containerWidth - gridCols×iconSize) / (gridCols + 1)
+  const phoneGridCols = S.gridCols ?? 4
+  const phoneWidgetHPad = `calc((100% - ${phoneGridCols * S.appIconSize}px) / ${phoneGridCols + 1})`
 
   const handlePhoneTouchStart = useCallback((e: React.TouchEvent) => {
     phonePageTouchRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY }
@@ -2217,63 +2318,81 @@ export default function MobileView() {
             >
               {/* Page 0 — Home */}
               <div
-                ref={phoneHomeScrollRef}
                 style={{
                   width: `${100 / PHONE_TOTAL_PAGES}%`,
                   height: '100%',
                   flexShrink: 0,
-                  overflowY: 'auto',
-                  WebkitOverflowScrolling: 'touch',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
                 }}
               >
+                {/* Scrollable app grid + optional welcome note */}
                 <div
+                  ref={phoneHomeScrollRef}
                   style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: S.gridRowGap ?? 14,
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: 'auto',
+                    WebkitOverflowScrolling: 'touch',
                   }}
                 >
                   <div
-                    ref={phoneHomeGridRef}
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns:
-                        S.cellWidth != null && S.gridCols != null
-                          ? `repeat(${S.gridCols}, ${S.cellWidth}px)`
-                          : `repeat(${S.gridCols ?? 4}, 1fr)`,
-                      gridAutoRows: 'auto',
-                      columnGap: S.gridColGap ?? 14,
-                      rowGap: S.gridRowGap ?? 14,
-                      justifyContent: S.cellWidth != null ? 'center' : 'stretch',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: S.gridRowGap ?? 14,
                     }}
                   >
-                    {page1AppButtons}
-                    <FriendsPhotoWidget
-                      widgetRadius={S.widgetRadius}
-                      wrapperStyle={{ gridArea: S.friendsArea }}
-                    />
-                  </div>
-                  {phoneShowWelcomeNote ? (
-                    <PortfolioNoteWidget
-                      dense
-                      widgetRadius={S.widgetRadius}
-                      shellStyle={WELCOME_NOTE_PHONE_SHELL_STYLE}
-                      bodyFontSize={12}
-                    />
-                  ) : null}
-                  <div>
-                    <MusicHomeWidget
-                      widgetRadius={S.widgetRadius}
-                      maxWidth={S.musicMaxWidth}
-                      wrapperStyle={{
-                        width: '100%',
-                        height: TABLET_MUSIC_BAR_HEIGHT_PX,
-                        flexShrink: 0,
-                        alignSelf: 'stretch',
-                        alignItems: 'stretch',
+                    <div
+                      ref={phoneHomeGridRef}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${S.gridCols ?? 4}, ${S.appIconSize}px)`,
+                        gridAutoRows: 'auto',
+                        columnGap: 0,
+                        rowGap: S.gridRowGap ?? 14,
+                        justifyContent: 'space-evenly',
                       }}
-                    />
+                    >
+                      {page1AppButtons}
+                      <FriendsPhotoWidget
+                        widgetRadius={S.widgetRadius}
+                        wrapperStyle={{ gridArea: S.friendsArea }}
+                      />
+                    </div>
+                    {phoneShowWelcomeNote ? (
+                      <div style={{ paddingLeft: phoneWidgetHPad, paddingRight: phoneWidgetHPad }}>
+                        <PortfolioNoteWidget
+                          dense
+                          widgetRadius={S.widgetRadius}
+                          shellStyle={WELCOME_NOTE_PHONE_SHELL_STYLE}
+                          bodyFontSize={12}
+                        />
+                      </div>
+                    ) : null}
                   </div>
+                </div>
+                {/* Music widget — always visible, pinned below the app grid */}
+                <div
+                  style={{
+                    flexShrink: 0,
+                    paddingTop: S.gridRowGap ?? 14,
+                    paddingLeft: phoneWidgetHPad,
+                    paddingRight: phoneWidgetHPad,
+                  }}
+                >
+                  <MusicHomeWidget
+                    widgetRadius={S.widgetRadius}
+                    maxWidth={S.musicMaxWidth}
+                    wrapperStyle={{
+                      width: '100%',
+                      height: TABLET_MUSIC_BAR_HEIGHT_PX,
+                      flexShrink: 0,
+                      alignSelf: 'stretch',
+                      alignItems: 'stretch',
+                    }}
+                  />
                 </div>
               </div>
 
@@ -2291,14 +2410,11 @@ export default function MobileView() {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns:
-                        S.cellWidth != null && S.gridCols != null
-                          ? `repeat(${S.gridCols}, ${S.cellWidth}px)`
-                          : `repeat(${S.gridCols ?? 4}, 1fr)`,
+                      gridTemplateColumns: `repeat(${S.gridCols ?? 4}, ${S.appIconSize}px)`,
                       gridAutoRows: 'auto',
-                      columnGap: S.gridColGap ?? 14,
+                      columnGap: 0,
                       rowGap: S.gridRowGap ?? 14,
-                      justifyContent: S.cellWidth != null ? 'center' : 'stretch',
+                      justifyContent: 'space-evenly',
                     }}
                   >
                     {page2AppButtons}
@@ -2386,14 +2502,14 @@ export default function MobileView() {
                       minWidth: 0,
                       alignSelf: 'stretch',
                       overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      alignContent: 'flex-start',
-                      justifyContent: 'flex-start',
-                      alignItems: 'flex-start',
-                      columnGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
-                      rowGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${ipadCols < 99 ? ipadCols : 1}, ${S.appIconSize}px)`,
+                      // Tablet: single column, apps distributed evenly top-to-bottom.
+                      // Laptop: space-evenly horizontally, apps start from top.
+                      justifyContent: 'space-evenly',
+                      gridAutoRows: 'max-content',
+                      alignContent: isTablet ? 'space-evenly' : 'start',
+                      rowGap: ipadRowGap,
                     }}
                   >
                     {page1AppButtons}
@@ -2446,15 +2562,15 @@ export default function MobileView() {
               >
                 {page2Apps.length > 0 && (
                   <div
+                    ref={ipadPage2GridRef}
                     style={{
-                      display: 'flex',
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      alignContent: 'flex-start',
-                      justifyContent: 'flex-start',
-                      alignItems: 'flex-start',
-                      columnGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
-                      rowGap: S.ipadAppWrapGap ?? TABLET_TILE_GUTTER_PX,
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${ipadPage2Cols < 99 ? ipadPage2Cols : 1}, ${S.appIconSize}px)`,
+                      justifyContent: 'start',
+                      columnGap: ipadPage2Gap,
+                      gridAutoRows: 'max-content',
+                      alignContent: 'start',
+                      rowGap: ipadPage2Gap,
                     }}
                   >
                     {page2AppButtons}
@@ -2708,7 +2824,10 @@ export default function MobileView() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 12,
-                      padding: macAppId === 'orsusHealth' ? '5px 14px' : '10px 14px',
+                      padding:
+                        macAppId === 'orsusHealth' || macAppId === 'lostInTranslation'
+                          ? '5px 14px'
+                          : '10px 14px',
                       background: 'linear-gradient(180deg, #ececed 0%, #e2e2e4 100%)',
                       borderBottom: '1px solid rgba(0,0,0,0.09)',
                       cursor: session.maximized ? 'default' : 'grab',
@@ -2786,6 +2905,8 @@ export default function MobileView() {
                     </div>
                     {macAppId === 'orsusHealth' ? (
                       <SafariToolbar />
+                    ) : macAppId === 'lostInTranslation' ? (
+                      <LitSafariToolbar />
                     ) : (
                       <span
                         id={`mac-window-title-${macAppId}`}
@@ -2863,7 +2984,10 @@ export default function MobileView() {
                 flexShrink: 0,
                 display: 'flex',
                 alignItems: 'center',
-                padding: activeApp === 'orsusHealth' ? '8px 16px' : '12px 16px',
+                padding:
+                  activeApp === 'orsusHealth' || activeApp === 'lostInTranslation'
+                    ? '8px 16px'
+                    : '12px 16px',
                 borderBottom: '1px solid rgba(255,255,255,0.08)',
               }}
             >
@@ -2900,6 +3024,13 @@ export default function MobileView() {
                   <SafariToolbar tone="onDark" showReload={false} />
                   <div style={{ width: 8, flexShrink: 0 }} />
                   <SafariReloadButton tone="onDark" />
+                </>
+              ) : activeApp === 'lostInTranslation' ? (
+                <>
+                  <div style={{ width: 12, flexShrink: 0 }} />
+                  <LitSafariToolbar tone="onDark" showReload={false} />
+                  <div style={{ width: 8, flexShrink: 0 }} />
+                  <LitSafariReloadButton tone="onDark" />
                 </>
               ) : (
                 <>
