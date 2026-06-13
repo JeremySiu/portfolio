@@ -129,19 +129,16 @@ function bannerWidthCapCss(aspectRatio: string, maxHeightPx: number): string {
 
 function ProjectBanner({
   project,
-  showName = false,
   aspectRatio = BANNER_ASPECT_RATIO,
   maxHeightPx,
 }: {
   project: Project
-  showName?: boolean
   aspectRatio?: string
   maxHeightPx: number
 }) {
   const [imgLoaded, setImgLoaded] = useState(false)
   const [imgFailed, setImgFailed] = useState(false)
 
-  const gradient = `linear-gradient(135deg, ${project.accent.from} 0%, ${project.accent.to} 100%)`
   const bannerWidthCap = bannerWidthCapCss(aspectRatio, maxHeightPx)
 
   return (
@@ -162,7 +159,7 @@ function ProjectBanner({
           containerType: 'inline-size' as React.CSSProperties['containerType'],
           borderRadius: 18,
           overflow: 'hidden',
-          background: gradient,
+          background: 'rgba(120,120,128,0.2)',
           boxShadow: '0 6px 18px rgba(0,0,0,0.32)',
         }}
       >
@@ -197,35 +194,19 @@ function ProjectBanner({
               position: 'absolute',
               inset: 0,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
-              padding: 12,
-              textAlign: 'center',
-              color: 'white',
             }}
           >
             <span
               style={{
-                fontSize: 'clamp(1.75rem, 38cqw, 2.875rem)',
+                fontSize: 'clamp(1.5rem, 32cqw, 2.5rem)',
                 lineHeight: 1,
+                opacity: 0.35,
               }}
             >
-              {project.emoji}
+              ◌
             </span>
-            {showName ? (
-              <span
-                style={{
-                  fontSize: 'clamp(0.8125rem, 16cqw, 1.125rem)',
-                  fontWeight: 700,
-                  letterSpacing: '-0.01em',
-                  textShadow: '0 1px 4px rgba(0,0,0,0.35)',
-                }}
-              >
-                {project.name}
-              </span>
-            ) : null}
           </div>
         )}
       </div>
@@ -280,7 +261,6 @@ function ProjectsGrid({ onSelect }: { onSelect: (p: Project) => void }) {
         >
           <ProjectBanner
             project={project}
-            showName
             maxHeightPx={BANNER_MAX_HEIGHT_GRID_PX}
           />
 
