@@ -125,22 +125,10 @@ const APPS: AppDef[] = [
     background: '#181818',
   },
   {
-    id: 'chess',
-    label: 'Chess',
-    Icon: rasterAppIcon(RASTER_APP_ICONS.chess),
-    background: 'linear-gradient(160deg, #e8cfa3 0%, #b0894a 45%, #4a3728 100%)',
-  },
-  {
-    id: 'clash',
-    label: 'Clash Royale',
-    Icon: rasterAppIcon(RASTER_APP_ICONS.clash),
-    background: 'linear-gradient(160deg, #7dd3fc 0%, #0284c7 52%, #0c4a6e 100%)',
-  },
-  {
-    id: 'pianoTiles',
-    label: 'Piano Tiles',
-    Icon: rasterAppIcon(RASTER_APP_ICONS.pianoTiles),
-    background: 'linear-gradient(160deg, #c084fc 0%, #7c3aed 50%, #4c1d95 100%)',
+    id: 'linkedin',
+    label: 'LinkedIn',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.linkedin),
+    background: 'linear-gradient(160deg, #93c5fd 0%, #2563eb 50%, #0a66c2 100%)',
   },
   {
     id: 'orsusHealth',
@@ -155,10 +143,22 @@ const APPS: AppDef[] = [
     background: 'linear-gradient(160deg, #ffffff 0%, #fff7e6 55%, #fde9b8 100%)',
   },
   {
-    id: 'linkedin',
-    label: 'LinkedIn',
-    Icon: rasterAppIcon(RASTER_APP_ICONS.linkedin),
-    background: 'linear-gradient(160deg, #93c5fd 0%, #2563eb 50%, #0a66c2 100%)',
+    id: 'pianoTiles',
+    label: 'Piano Tiles',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.pianoTiles),
+    background: 'linear-gradient(160deg, #c084fc 0%, #7c3aed 50%, #4c1d95 100%)',
+  },
+  {
+    id: 'chess',
+    label: 'Chess',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.chess),
+    background: 'linear-gradient(160deg, #e8cfa3 0%, #b0894a 45%, #4a3728 100%)',
+  },
+  {
+    id: 'clash',
+    label: 'Clash Royale',
+    Icon: rasterAppIcon(RASTER_APP_ICONS.clash),
+    background: 'linear-gradient(160deg, #7dd3fc 0%, #0284c7 52%, #0c4a6e 100%)',
   },
   {
     id: 'phone',
