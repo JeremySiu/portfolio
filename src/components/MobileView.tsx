@@ -300,7 +300,7 @@ function PhoneApp() {
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => navigator.clipboard?.writeText(PHONE_NUMBER).catch(() => {})}
-          style={{ color: '#34c759', fontSize: 14, fontWeight: 500 }}
+          style={{ color: '#34c759', fontSize: 14, fontWeight: 500, touchAction: 'manipulation' }}
         >
           Copy
         </motion.button>
@@ -321,6 +321,7 @@ function PhoneApp() {
           fontWeight: 600,
           fontSize: 16,
           background: 'linear-gradient(180deg, #2bd667 0%, #1aa84a 100%)',
+          touchAction: 'manipulation',
         }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
@@ -561,6 +562,7 @@ function EmailApp() {
           fontSize: 14,
           background: L ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
           border: L ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
+          touchAction: 'manipulation',
         }}
       >
         {copied ? 'Copied!' : 'Copy email address'}
@@ -1049,6 +1051,7 @@ function FriendsPhotoWidget({
                 padding: 0,
                 cursor: 'pointer',
                 transition: 'width 0.2s ease, height 0.2s ease, opacity 0.2s ease',
+                touchAction: 'manipulation',
               }}
             />
           ))}
@@ -1140,6 +1143,7 @@ function MusicHomeWidget({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    touchAction: 'manipulation',
   }
 
   return (
@@ -2163,6 +2167,7 @@ export default function MobileView() {
         border: 'none',
         padding: 0,
         cursor: 'pointer',
+        touchAction: 'manipulation',
       }}
     >
       <div
@@ -2690,6 +2695,7 @@ export default function MobileView() {
                 margin: 0,
                 cursor: 'pointer',
                 lineHeight: 0,
+                touchAction: 'manipulation',
               }}
             >
               <div
@@ -3005,6 +3011,7 @@ export default function MobileView() {
                   border: 'none',
                   padding: '4px 4px',
                   cursor: 'pointer',
+                  touchAction: 'manipulation',
                 }}
               >
                 <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
